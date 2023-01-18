@@ -21,7 +21,8 @@ include(PybindWrap)
 ## Load the necessary files to compile the wrapper
 
 # Load the pybind11 code
-add_subdirectory(${PROJECT_SOURCE_DIR}/wrap/pybind11 pybind11)
+# add_subdirectory(${PROJECT_SOURCE_DIR}/wrap/pybind11 pybind11)
+find_package(pybind11)
 # Set the wrapping script variable
 set(PYBIND_WRAP_SCRIPT "${PROJECT_SOURCE_DIR}/wrap/scripts/pybind_wrap.py")
 ############################################################
