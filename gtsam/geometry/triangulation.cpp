@@ -169,7 +169,7 @@ Point3 optimize(const NonlinearFactorGraph& graph, const Values& values,
   LevenbergMarquardtOptimizer optimizer(graph, values, params);
   Values result = optimizer.optimize();
 
-  return result.at<Point3>(landmarkKey);
+  return boost::any_cast<Point3>(result.at(landmarkKey));
 }
 
 }  // namespace gtsam
