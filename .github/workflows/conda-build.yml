@@ -45,9 +45,10 @@ jobs:
           environments: test
           cache: true
 
-      # ccache is not used by MSVC builds, but the cache step is harmless there.
+      # Restore the newest cache for this platform. ccache is not used by MSVC
+      # builds, but the step is harmless there.
       - name: Restore the compiler cache
-        uses: actions/cache@v6
+        uses: actions/cache/restore@v6
         with:
           path: .ccache
           key: ccache-${{ matrix.platform }}-${{ github.sha }}
@@ -70,6 +71,16 @@ jobs:
 
       - name: Build the conda package
         run: pixi build --output-dir dist
+
+      # Only push builds write a cache entry. Saving on every pull request as
+      # well would churn through the 10 GB per-repository limit and evict the
+      # entries the restore above depends on.
+      - name: Save the compiler cache
+        if: github.event_name == 'push'
+        uses: actions/cache/save@v6
+        with:
+          path: .ccache
+          key: ccache-${{ matrix.platform }}-${{ github.sha }}
 
       - uses: actions/upload-artifact@v7
         with:

@@ -99,6 +99,8 @@ pytest = "*"
 [feature.test.activation.env]
 CMAKE_PREFIX_PATH = "$CONDA_PREFIX"
 CCACHE_DIR = "$PIXI_PROJECT_ROOT/.ccache"
+# Five platforms share a 10 GB per-repository cache limit on GitHub.
+CCACHE_MAXSIZE = "1G"
 
 # conda-forge puts headers and libraries under <prefix>/Library on Windows.
 [feature.test.target.win-64.activation.env]
