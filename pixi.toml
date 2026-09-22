@@ -24,9 +24,15 @@ backend = { name = "pixi-build-cmake", version = "0.*" }
 [package.build.config]
 # cephes (gtsam/3rdparty/cephes) is C, the rest is C++.
 compilers = ["c", "cxx"]
-# The GTSAM options live in an initial-cache script shared with the test
-# environment below, so the two cannot drift apart.
-extra-args = ["-C", "cmake/CondaDefaults.cmake", "-DGTSAM_PYTHON_INSTALL_INTO_PREFIX=ON"]
+# The GTSAM options live in cmake/CondaDefaults.cmake, shared with the test
+# environment below so the packaged build and the tested build cannot drift
+# apart. CMAKE_PROJECT_TOP_LEVEL_INCLUDES resolves relative to the source tree,
+# unlike `cmake -C`, which resolves against the working directory -- this
+# backend runs cmake from a build directory far away from the sources.
+extra-args = [
+  "-DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=cmake/CondaDefaults.cmake",
+  "-DGTSAM_PYTHON_INSTALL_INTO_PREFIX=ON",
+]
 # `pixi build` builds the default target, which includes the pybind11 wrappers.
 # Those need several GB each, so compiling two at once is killed on a 16 GB CI
 # runner. There is no way to serialize just that step here, so cap the whole
@@ -37,7 +43,7 @@ env = { CMAKE_BUILD_PARALLEL_LEVEL = "1" }
 # drive the build, ccache makes repeat builds cheap. The backend adds cmake and
 # ninja implicitly; spelling them out keeps the build/host split explicit.
 [package.build-dependencies]
-cmake = ">=3.22"
+cmake = ">=3.24"
 ninja = "*"
 ccache = "*"
 
@@ -71,7 +77,7 @@ pyparsing = "*"
 [feature.test.dependencies]
 c-compiler = "*"
 cxx-compiler = "*"
-cmake = ">=3.22"
+cmake = ">=3.24"
 ninja = "*"
 ccache = "*"
 libboost-devel = ">=1.82"
@@ -99,7 +105,10 @@ CCACHE_DIR = "$PIXI_PROJECT_ROOT/.ccache"
 CMAKE_PREFIX_PATH = "$CONDA_PREFIX\\Library"
 
 [feature.test.tasks.configure]
-cmd = ["cmake", "-G", "Ninja", "-S", ".", "-B", "build", "-C", "cmake/CondaDefaults.cmake"]
+cmd = [
+  "cmake", "-G", "Ninja", "-S", ".", "-B", "build",
+  "-DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=cmake/CondaDefaults.cmake",
+]
 inputs = ["CMakeLists.txt", "cmake/**"]
 
 [feature.test.tasks.build]

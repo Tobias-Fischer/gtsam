@@ -1,5 +1,6 @@
-# CMake initial-cache script (pass with `cmake -C cmake/CondaDefaults.cmake`)
-# holding the options used to build GTSAM against conda-forge dependencies.
+# Cache defaults for building GTSAM against conda-forge dependencies. Pass with
+#   cmake -DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=cmake/CondaDefaults.cmake
+# which, unlike `cmake -C`, takes a path relative to the source tree.
 #
 # Shared by `pixi build` and the pixi `test` environment so the packaged build
 # and the tested build cannot drift apart. See pixi.toml.
