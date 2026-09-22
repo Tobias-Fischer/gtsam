@@ -26,5 +26,12 @@ set(GTSAM_USE_SYSTEM_PYBIND ON CACHE BOOL "")
 # conda-forge ships only shared Boost.
 set(Boost_USE_STATIC_LIBS OFF CACHE BOOL "")
 
+# One executable per test file, as on Linux. MSVC and Xcode default to
+# combining each group into a single binary, which reports failures as one
+# opaque check_<group>_program and makes a crash impossible to attribute to a
+# test. It is also unsound: same-named TEST(group, name) pairs in different
+# files collide at link time.
+set(GTSAM_SINGLE_TEST_EXE OFF CACHE BOOL "")
+
 set(GTSAM_BUILD_PYTHON ON CACHE BOOL "")
 set(GTSAM_INSTALL_CPPUNITLITE OFF CACHE BOOL "")
