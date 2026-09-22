@@ -1,0 +1,29 @@
+# CMake initial-cache script (pass with `cmake -C cmake/CondaDefaults.cmake`)
+# holding the options used to build GTSAM against conda-forge dependencies.
+#
+# Shared by `pixi build` and the pixi `test` environment so the packaged build
+# and the tested build cannot drift apart. See pixi.toml.
+
+set(CMAKE_BUILD_TYPE Release CACHE STRING "")
+
+# Binaries have to run on machines other than the builder.
+set(GTSAM_BUILD_WITH_MARCH_NATIVE OFF CACHE BOOL "")
+
+# Warnings-as-errors is useful upstream, but it would make the packaged build
+# hostage to every new compiler version conda-forge ships.
+set(GTSAM_BUILD_WITH_WERROR OFF CACHE BOOL "")
+
+# Nothing here needs the examples or the timing scripts.
+set(GTSAM_BUILD_EXAMPLES_ALWAYS OFF CACHE BOOL "")
+set(GTSAM_BUILD_TIMING_ALWAYS OFF CACHE BOOL "")
+
+# Use the conda-forge packages rather than the bundled copies.
+set(GTSAM_USE_SYSTEM_EIGEN ON CACHE BOOL "")
+set(GTSAM_USE_SYSTEM_METIS ON CACHE BOOL "")
+set(GTSAM_USE_SYSTEM_PYBIND ON CACHE BOOL "")
+
+# conda-forge ships only shared Boost.
+set(Boost_USE_STATIC_LIBS OFF CACHE BOOL "")
+
+set(GTSAM_BUILD_PYTHON ON CACHE BOOL "")
+set(GTSAM_INSTALL_CPPUNITLITE OFF CACHE BOOL "")

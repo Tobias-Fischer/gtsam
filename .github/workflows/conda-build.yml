@@ -1,0 +1,75 @@
+name: Conda build
+
+# Builds GTSAM against conda-forge dependencies (system Eigen, metis, TBB,
+# Boost, SuiteSparse) on every platform the conda-forge feedstock ships, runs
+# the C++ and Python test suites, and builds the conda package itself. This is
+# the combination that tends to surface portability problems, so catching them
+# here avoids discovering them at release time in
+# https://github.com/conda-forge/gtsam-feedstock.
+
+on:
+  push:
+    branches: [develop]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.platform }}
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-64
+            runs-on: ubuntu-latest
+          - platform: linux-aarch64
+            runs-on: ubuntu-24.04-arm
+          - platform: osx-64
+            runs-on: macos-15-intel
+          - platform: osx-arm64
+            runs-on: macos-15
+          - platform: win-64
+            runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: prefix-dev/setup-pixi@v0.10.2
+        with:
+          pixi-version: v0.81.0
+          environments: test
+          cache: true
+
+      # ccache is not used by MSVC builds, but the cache step is harmless there.
+      - name: Restore the compiler cache
+        uses: actions/cache@v6
+        with:
+          path: .ccache
+          key: ccache-${{ matrix.platform }}-${{ github.sha }}
+          restore-keys: ccache-${{ matrix.platform }}-
+
+      - name: Check pixi.toml and CMakeLists.txt agree on the version
+        run: pixi run -e test check-version
+
+      - name: Build GTSAM and the unit tests
+        run: pixi run -e test build-tests
+
+      - name: Run the C++ tests
+        run: pixi run -e test test
+
+      - name: Run the Python tests
+        run: pixi run -e test python-test
+
+      - name: Build the conda package
+        run: pixi build --output-dir dist
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: conda-package-${{ matrix.platform }}
+          path: dist/*.conda
+          if-no-files-found: error
