@@ -50,3 +50,4 @@ build-tbb/
 .pixi/
 /dist/
 /.ccache/
+/.ccache-pkg/

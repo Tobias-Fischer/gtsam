@@ -99,6 +99,8 @@ pytest = "*"
 [feature.test.activation.env]
 CMAKE_PREFIX_PATH = "$CONDA_PREFIX"
 CCACHE_DIR = "$PIXI_PROJECT_ROOT/.ccache"
+CCACHE_BASEDIR = "$PIXI_PROJECT_ROOT"
+CCACHE_NOHASHDIR = "1"
 # Five platforms share a 10 GB per-repository cache limit on GitHub.
 CCACHE_MAXSIZE = "1G"
 

@@ -50,7 +50,9 @@ jobs:
       - name: Restore the compiler cache
         uses: actions/cache/restore@v6
         with:
-          path: .ccache
+          path: |
+            .ccache
+            .ccache-pkg
           key: ccache-${{ matrix.platform }}-${{ github.sha }}
           restore-keys: ccache-${{ matrix.platform }}-
 
@@ -71,8 +73,29 @@ jobs:
 
       # --path: GTSAM ships a ROS package.xml, which pixi also accepts as a
       # package manifest and picks over pixi.toml.
+      # Reports the real hit rate, so a cache that has silently stopped working
+      # shows up here instead of as an unexplained slowdown.
+      - name: Test build cache statistics
+        if: always()
+        run: pixi run -e test ccache --show-stats
+
+      # `pixi build` compiles with the conda toolchain and its own flags, so its
+      # objects never match the ones the test environment produced: sharing a
+      # cache only lets the two evict each other. Give it its own, and make
+      # ccache ignore the work directory, whose path changes between runs.
       - name: Build the conda package
         run: pixi build --path pixi.toml --output-dir dist
+        env:
+          CCACHE_DIR: ${{ github.workspace }}/.ccache-pkg
+          CCACHE_BASEDIR: ${{ github.workspace }}
+          CCACHE_NOHASHDIR: "1"
+          CCACHE_MAXSIZE: 1G
+
+      - name: Package build cache statistics
+        if: always()
+        run: pixi exec --spec ccache ccache --show-stats
+        env:
+          CCACHE_DIR: ${{ github.workspace }}/.ccache-pkg
 
       # Only push builds write a cache entry. Saving on every pull request as
       # well would churn through the 10 GB per-repository limit and evict the
@@ -81,7 +104,9 @@ jobs:
         if: github.event_name == 'push'
         uses: actions/cache/save@v6
         with:
-          path: .ccache
+          path: |
+            .ccache
+            .ccache-pkg
           key: ccache-${{ matrix.platform }}-${{ github.sha }}
 
       - uses: actions/upload-artifact@v7
