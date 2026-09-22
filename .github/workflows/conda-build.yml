@@ -69,8 +69,10 @@ jobs:
       - name: Run the Python tests
         run: pixi run -e test python-test
 
+      # --path: GTSAM ships a ROS package.xml, which pixi also accepts as a
+      # package manifest and picks over pixi.toml.
       - name: Build the conda package
-        run: pixi build --output-dir dist
+        run: pixi build --path pixi.toml --output-dir dist
 
       # Only push builds write a cache entry. Saving on every pull request as
       # well would churn through the 10 GB per-repository limit and evict the
