@@ -9,7 +9,7 @@ name: Conda build
 
 on:
   push:
-    branches: [develop]
+    branches: [develop, pixi-conda-ci]  # TEMPORARY: drop pixi-conda-ci before the PR
   pull_request:
   workflow_dispatch:
 
