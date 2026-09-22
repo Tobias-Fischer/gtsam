@@ -27,6 +27,11 @@ compilers = ["c", "cxx"]
 # The GTSAM options live in an initial-cache script shared with the test
 # environment below, so the two cannot drift apart.
 extra-args = ["-C", "cmake/CondaDefaults.cmake", "-DGTSAM_PYTHON_INSTALL_INTO_PREFIX=ON"]
+# `pixi build` builds the default target, which includes the pybind11 wrappers.
+# Those need several GB each, so compiling two at once is killed on a 16 GB CI
+# runner. There is no way to serialize just that step here, so cap the whole
+# package build.
+env = { CMAKE_BUILD_PARALLEL_LEVEL = "1" }
 
 # Run on the build machine, so they are build dependencies: cmake and ninja
 # drive the build, ccache makes repeat builds cheap. The backend adds cmake and
@@ -98,8 +103,17 @@ cmd = ["cmake", "-G", "Ninja", "-S", ".", "-B", "build", "-C", "cmake/CondaDefau
 inputs = ["CMakeLists.txt", "cmake/**"]
 
 [feature.test.tasks.build]
-cmd = ["cmake", "--build", "build"]
+cmd = ["cmake", "--build", "build", "--target", "gtsam", "gtsam_unstable"]
 depends-on = ["configure"]
+
+# Each pybind11 translation unit needs several GB to compile, and two at once
+# exhausts a 16 GB CI runner: the job is killed with SIGTERM part way through
+# python/CMakeFiles/gtsam_py.dir. The library and the tests are made of much
+# smaller translation units and build fine in parallel, so only the wrappers
+# are serialized.
+[feature.test.tasks.build-python]
+cmd = ["cmake", "--build", "build", "--target", "gtsam_py", "gtsam_unstable_py", "--parallel", "1"]
+depends-on = ["build"]
 
 [feature.test.tasks.build-tests]
 cmd = ["cmake", "--build", "build", "--target", "all.tests"]
@@ -111,7 +125,7 @@ depends-on = ["build-tests"]
 
 [feature.test.tasks.python-test]
 cmd = ["cmake", "--build", "build", "--target", "python-test"]
-depends-on = ["build"]
+depends-on = ["build-python"]
 
 # pixi cannot read the version out of CMakeLists.txt yet
 # (prefix-dev/pixi#2946), so check the two agree rather than letting them
