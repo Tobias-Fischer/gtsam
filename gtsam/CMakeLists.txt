@@ -233,6 +233,12 @@ gtsam_apply_build_flags(gtsam)
 
 if(GTSAM_BUILD_WITH_PRECOMPILED_HEADERS)
   target_precompile_headers(gtsam PRIVATE $<$<COMPILE_LANGUAGE:CXX>:<gtsam/precompiled_header.h$<ANGLE-R>>)
+  # Unit3.cpp is compiled without the precompiled header. With it, MSVC gives
+  # Unit3::retract a 3 MB stack frame, over the 1 MB default stack on Windows,
+  # and every caller dies with STATUS_STACK_OVERFLOW. It is the only function in
+  # the library with a frame anywhere near that size.
+  set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/geometry/Unit3.cpp
+      PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 endif()
 
 set_target_properties(gtsam PROPERTIES
