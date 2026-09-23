@@ -1,16 +1,12 @@
 name: Conda build
 
-# Builds GTSAM against conda-forge dependencies (system Eigen, metis, TBB,
-# Boost, SuiteSparse) on every platform the conda-forge feedstock ships, runs
-# the C++ and Python test suites, and builds the conda package itself. This is
-# the combination that tends to surface portability problems, so catching them
-# here avoids discovering them at release time in
-# https://github.com/conda-forge/gtsam-feedstock.
+# DIAGNOSTIC BRANCH. Stripped down to the one question being asked: do the 19
+# Windows access violations survive with GTSAM_USE_TBB=OFF? win-64 only, C++
+# tests only, no package build.
 
 on:
   push:
-    branches: [develop, pixi-conda-ci]  # TEMPORARY: drop pixi-conda-ci before the PR
-  pull_request:
+    branches: [diag-tbb-off]
   workflow_dispatch:
 
 concurrency:
@@ -19,22 +15,8 @@ concurrency:
 
 jobs:
   build:
-    name: ${{ matrix.platform }}
-    runs-on: ${{ matrix.runs-on }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: linux-64
-            runs-on: ubuntu-latest
-          - platform: linux-aarch64
-            runs-on: ubuntu-24.04-arm
-          - platform: osx-64
-            runs-on: macos-15-intel
-          - platform: osx-arm64
-            runs-on: macos-15
-          - platform: win-64
-            runs-on: windows-latest
+    name: win-64 (TBB off)
+    runs-on: windows-latest
 
     steps:
       - uses: actions/checkout@v7
@@ -45,20 +27,16 @@ jobs:
           environments: test
           cache: true
 
-      # Restore the newest cache for this platform. ccache is not used by MSVC
-      # builds, but the step is harmless there.
+      # Read-only: this build's objects differ from the real ones (no TBB), so
+      # it must not write back over the branch caches.
       - name: Restore the compiler cache
         uses: actions/cache/restore@v6
         with:
           path: |
             .ccache
-            .ccache-pkg
             .sccache
-          key: ccache-${{ matrix.platform }}-${{ github.sha }}
-          restore-keys: ccache-${{ matrix.platform }}-
-
-      - name: Check pixi.toml and CMakeLists.txt agree on the version
-        run: pixi run -e test check-version
+          key: ccache-win-64-diag-tbb-off
+          restore-keys: ccache-win-64-
 
       - name: Build GTSAM and the unit tests
         run: pixi run -e test build-tests
@@ -66,59 +44,7 @@ jobs:
       - name: Run the C++ tests
         run: pixi run -e test test
 
-      - name: Build the Python wrappers
-        run: pixi run -e test build-python
-
-      - name: Run the Python tests
-        run: pixi run -e test python-test
-
-      # --path: GTSAM ships a ROS package.xml, which pixi also accepts as a
-      # package manifest and picks over pixi.toml.
-      # Reports the real hit rate, so a cache that has silently stopped working
-      # shows up here instead of as an unexplained slowdown.
-      - name: Test build cache statistics
+      - name: Cache statistics
         if: always()
-        run: pixi run -e test ccache --show-stats
-        continue-on-error: true
-
-      - name: Test build cache statistics (Windows)
-        if: always() && runner.os == 'Windows'
         run: pixi run -e test sccache --show-stats
         continue-on-error: true
-
-      # `pixi build` compiles with the conda toolchain and its own flags, so its
-      # objects never match the ones the test environment produced: sharing a
-      # cache only lets the two evict each other. Give it its own, and make
-      # ccache ignore the work directory, whose path changes between runs.
-      - name: Build the conda package
-        run: pixi build --path pixi.toml --output-dir dist
-        env:
-          CCACHE_DIR: ${{ github.workspace }}/.ccache-pkg
-          CCACHE_BASEDIR: ${{ github.workspace }}
-          CCACHE_NOHASHDIR: "1"
-          CCACHE_MAXSIZE: 1G
-
-      - name: Package build cache statistics
-        if: always()
-        run: pixi exec --spec ccache ccache --show-stats
-        env:
-          CCACHE_DIR: ${{ github.workspace }}/.ccache-pkg
-
-      # Only push builds write a cache entry. Saving on every pull request as
-      # well would churn through the 10 GB per-repository limit and evict the
-      # entries the restore above depends on.
-      - name: Save the compiler cache
-        if: github.event_name == 'push'
-        uses: actions/cache/save@v6
-        with:
-          path: |
-            .ccache
-            .ccache-pkg
-            .sccache
-          key: ccache-${{ matrix.platform }}-${{ github.sha }}
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: conda-package-${{ matrix.platform }}
-          path: dist/*.conda
-          if-no-files-found: error
