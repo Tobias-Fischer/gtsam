@@ -53,6 +53,7 @@ jobs:
           path: |
             .ccache
             .ccache-pkg
+            .sccache
           key: ccache-${{ matrix.platform }}-${{ github.sha }}
           restore-keys: ccache-${{ matrix.platform }}-
 
@@ -78,6 +79,12 @@ jobs:
       - name: Test build cache statistics
         if: always()
         run: pixi run -e test ccache --show-stats
+        continue-on-error: true
+
+      - name: Test build cache statistics (Windows)
+        if: always() && runner.os == 'Windows'
+        run: pixi run -e test sccache --show-stats
+        continue-on-error: true
 
       # `pixi build` compiles with the conda toolchain and its own flags, so its
       # objects never match the ones the test environment produced: sharing a
@@ -107,6 +114,7 @@ jobs:
           path: |
             .ccache
             .ccache-pkg
+            .sccache
           key: ccache-${{ matrix.platform }}-${{ github.sha }}
 
       - uses: actions/upload-artifact@v7

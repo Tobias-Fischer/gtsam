@@ -51,3 +51,4 @@ build-tbb/
 /dist/
 /.ccache/
 /.ccache-pkg/
+/.sccache/
