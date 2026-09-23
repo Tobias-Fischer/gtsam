@@ -32,6 +32,8 @@ set(Boost_USE_STATIC_LIBS OFF CACHE BOOL "")
 # test. It is also unsound: same-named TEST(group, name) pairs in different
 # files collide at link time.
 set(GTSAM_SINGLE_TEST_EXE OFF CACHE BOOL "")
+# DIAGNOSTIC ONLY
+set(GTSAM_BUILD_WITH_PRECOMPILED_HEADERS OFF CACHE BOOL "")
 
 set(GTSAM_BUILD_PYTHON ON CACHE BOOL "")
 set(GTSAM_INSTALL_CPPUNITLITE OFF CACHE BOOL "")
