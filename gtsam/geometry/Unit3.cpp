@@ -291,8 +291,12 @@ Unit3 Unit3::retract(const Vector2& v, OptionalJacobian<2,2> H) const {
     const Unit3 exp_p_xi_hat = Unit3::FromPoint3(c * p_ + xi_hat,
                                                  H? &H_from_point : nullptr);
     if (H) { // Jacobian
-      *H = H_from_point *
-          (-p_ * xi_hat.transpose() + Matrix33::Identity()) * basis();
+      // Evaluated into a named 3x3 rather than left as an expression: MSVC
+      // inlines the whole expression tree into retract() otherwise, which
+      // costs megabytes of stack. See the comment on the general case below.
+      const Matrix33 H_point_xi_hat =
+          -p_ * xi_hat.transpose() + Matrix33::Identity();
+      *H = H_from_point * H_point_xi_hat * basis();
     }
     return exp_p_xi_hat;
   }
@@ -301,9 +305,15 @@ Unit3 Unit3::retract(const Vector2& v, OptionalJacobian<2,2> H) const {
   const Unit3 exp_p_xi_hat = Unit3::FromPoint3(c * p_ + xi_hat * st,
                                                H? &H_from_point : nullptr);
   if (H) { // Jacobian
-    *H = H_from_point *
-        (p_ * -st * xi_hat.transpose() + st * Matrix33::Identity() +
-        xi_hat * ((c - st) / std::pow(theta, 2)) * xi_hat.transpose()) * basis();
+    // This must be evaluated into a named 3x3 matrix rather than left as an
+    // Eigen expression. As a single expression, MSVC instantiates and inlines
+    // the entire template tree into retract(), producing a 4 MB function with
+    // a 3 MB stack frame -- more than the 1 MB default stack on Windows, so
+    // every test that retracts a Unit3 dies with STATUS_STACK_OVERFLOW.
+    const Matrix33 H_point_xi_hat =
+        p_ * -st * xi_hat.transpose() + st * Matrix33::Identity() +
+        xi_hat * ((c - st) / std::pow(theta, 2)) * xi_hat.transpose();
+    *H = H_from_point * H_point_xi_hat * basis();
   }
   return exp_p_xi_hat;
 }
