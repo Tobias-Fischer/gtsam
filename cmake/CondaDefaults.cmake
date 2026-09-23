@@ -32,6 +32,9 @@ set(Boost_USE_STATIC_LIBS OFF CACHE BOOL "")
 # test. It is also unsound: same-named TEST(group, name) pairs in different
 # files collide at link time.
 set(GTSAM_SINGLE_TEST_EXE OFF CACHE BOOL "")
+# DIAGNOSTIC ONLY: upstream's Windows CI builds with this OFF, so the inline
+# deprecated members of GTSAM_EXPORT classes are never tested there.
+set(GTSAM_ALLOW_DEPRECATED_SINCE_V43 OFF CACHE BOOL "")
 
 set(GTSAM_BUILD_PYTHON ON CACHE BOOL "")
 set(GTSAM_INSTALL_CPPUNITLITE OFF CACHE BOOL "")
