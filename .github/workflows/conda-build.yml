@@ -1,16 +1,13 @@
 name: Conda build
 
-# Builds GTSAM against conda-forge dependencies (system Eigen, metis, TBB,
-# Boost, SuiteSparse) on every platform the conda-forge feedstock ships, runs
-# the C++ and Python test suites, and builds the conda package itself. This is
-# the combination that tends to surface portability problems, so catching them
-# here avoids discovering them at release time in
-# https://github.com/conda-forge/gtsam-feedstock.
+# DIAGNOSTIC BRANCH. The 19 failing Windows tests exit in ~0.1s having printed
+# nothing, so they die before main runs -- at load or static-init time. This
+# run gets the actual NTSTATUS, compares imports against exports in case the
+# loader is refusing a symbol, and takes a symbolised stack under cdb.
 
 on:
   push:
-    branches: [develop, pixi-conda-ci]  # TEMPORARY: drop pixi-conda-ci before the PR
-  pull_request:
+    branches: [diag-exitcode-v2]
   workflow_dispatch:
 
 concurrency:
@@ -19,22 +16,11 @@ concurrency:
 
 jobs:
   build:
-    name: ${{ matrix.platform }}
-    runs-on: ${{ matrix.runs-on }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: linux-64
-            runs-on: ubuntu-latest
-          - platform: linux-aarch64
-            runs-on: ubuntu-24.04-arm
-          - platform: osx-64
-            runs-on: macos-15-intel
-          - platform: osx-arm64
-            runs-on: macos-15
-          - platform: win-64
-            runs-on: windows-latest
+    name: win-64 (crash detail)
+    runs-on: windows-latest
+    env:
+      SCCACHE_DIR: ${{ github.workspace }}/.sccache
+      SCCACHE_CACHE_SIZE: 2G
 
     steps:
       - uses: actions/checkout@v7
@@ -45,80 +31,53 @@ jobs:
           environments: test
           cache: true
 
-      # Restore the newest cache for this platform. ccache is not used by MSVC
-      # builds, but the step is harmless there.
       - name: Restore the compiler cache
         uses: actions/cache/restore@v6
         with:
-          path: |
-            .ccache
-            .ccache-pkg
-            .sccache
-          key: ccache-${{ matrix.platform }}-${{ github.sha }}
-          restore-keys: ccache-${{ matrix.platform }}-
+          path: .sccache
+          key: sccache-win-64-diag-v2
+          restore-keys: sccache-win-64-
 
-      - name: Check pixi.toml and CMakeLists.txt agree on the version
-        run: pixi run -e test check-version
-
-      - name: Build GTSAM and the unit tests
-        run: pixi run -e test build-tests
-
-      - name: Run the C++ tests
-        run: pixi run -e test test
-
-      - name: Build the Python wrappers
-        run: pixi run -e test build-python
-
-      - name: Run the Python tests
-        run: pixi run -e test python-test
-
-      # --path: GTSAM ships a ROS package.xml, which pixi also accepts as a
-      # package manifest and picks over pixi.toml.
-      # Reports the real hit rate, so a cache that has silently stopped working
-      # shows up here instead of as an unexplained slowdown.
-      - name: Test build cache statistics
-        if: always()
-        run: pixi run -e test ccache --show-stats
+      # cdb is not on the runner image. Without it the fault code is all we get.
+      - name: Install the Windows debugging tools
+        run: |
+          Invoke-WebRequest -Uri "https://go.microsoft.com/fwlink/?linkid=2272610" -OutFile winsdksetup.exe
+          Start-Process -FilePath .\winsdksetup.exe -ArgumentList "/features","OptionId.WindowsDesktopDebuggers","/quiet","/norestart" -Wait
+          $cdb = "C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\cdb.exe"
+          if (Test-Path $cdb) { Write-Host "cdb installed" } else { Write-Host "cdb still missing" }
         continue-on-error: true
 
-      - name: Test build cache statistics (Windows)
-        if: always() && runner.os == 'Windows'
+      # The debug-info flags live in cmake/CondaDefaults.cmake on this branch,
+      # so this is the ordinary configure task: passing extra -D arguments here
+      # gets them split by the shell.
+      - name: Configure
+        run: pixi run -e test configure
+
+      # One crashing test and one passing test that also leans on Unit3.
+      - name: Build the two tests
+        run: pixi run -e test cmake --build build --target testUnit3 testRot3
+
+      - name: Run them and report the fault
+        run: pixi run -e test pwsh -NoProfile -File .github/diag/run-crash.ps1
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: win64-crash-detail
+          path: |
+            imports.txt
+            exports.txt
+            build/bin/*.pdb
+          if-no-files-found: warn
+
+      - name: Cache statistics
+        if: always()
         run: pixi run -e test sccache --show-stats
         continue-on-error: true
 
-      # `pixi build` compiles with the conda toolchain and its own flags, so its
-      # objects never match the ones the test environment produced: sharing a
-      # cache only lets the two evict each other. Give it its own, and make
-      # ccache ignore the work directory, whose path changes between runs.
-      - name: Build the conda package
-        run: pixi build --path pixi.toml --output-dir dist
-        env:
-          CCACHE_DIR: ${{ github.workspace }}/.ccache-pkg
-          CCACHE_BASEDIR: ${{ github.workspace }}
-          CCACHE_NOHASHDIR: "1"
-          CCACHE_MAXSIZE: 1G
-
-      - name: Package build cache statistics
-        if: always()
-        run: pixi exec --spec ccache ccache --show-stats
-        env:
-          CCACHE_DIR: ${{ github.workspace }}/.ccache-pkg
-
-      # Only push builds write a cache entry. Saving on every pull request as
-      # well would churn through the 10 GB per-repository limit and evict the
-      # entries the restore above depends on.
       - name: Save the compiler cache
-        if: github.event_name == 'push'
+        if: always()
         uses: actions/cache/save@v6
         with:
-          path: |
-            .ccache
-            .ccache-pkg
-            .sccache
-          key: ccache-${{ matrix.platform }}-${{ github.sha }}
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: conda-package-${{ matrix.platform }}
-          path: dist/*.conda
-          if-no-files-found: error
+          path: .sccache
+          key: sccache-win-64-diag-v2

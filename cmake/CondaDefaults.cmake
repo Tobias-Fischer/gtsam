@@ -33,5 +33,14 @@ set(Boost_USE_STATIC_LIBS OFF CACHE BOOL "")
 # files collide at link time.
 set(GTSAM_SINGLE_TEST_EXE OFF CACHE BOOL "")
 
+# DIAGNOSTIC ONLY. /Z7 puts debug info in the object file rather than a shared
+# PDB, so sccache can still cache the compile, and /DEBUG makes the linker emit
+# a PDB for cdb. Optimisation settings are untouched, so codegen matches the
+# real build and the crash reproduces as it does there.
+if(WIN32)
+  add_compile_options(/Z7)
+  add_link_options(/DEBUG)
+endif()
+
 set(GTSAM_BUILD_PYTHON ON CACHE BOOL "")
 set(GTSAM_INSTALL_CPPUNITLITE OFF CACHE BOOL "")
