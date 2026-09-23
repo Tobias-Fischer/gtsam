@@ -1,10 +1,12 @@
 name: Conda build
 
-# DIAGNOSTIC BRANCH. win-64 only, C++ tests only.
+# DIAGNOSTIC BRANCH. Measures the stack frame of Unit3::retract with the fix
+# applied and precompiled headers left ON, to check the fix removes the cause
+# rather than merely dropping the frame under the 1 MB Windows limit.
 
 on:
   push:
-    branches: [fix-unit3-retract-stack]
+    branches: [diag-fix-framesize]
   workflow_dispatch:
 
 concurrency:
@@ -13,7 +15,7 @@ concurrency:
 
 jobs:
   build:
-    name: win-64 (retract fix)
+    name: win-64 (frame size)
     runs-on: windows-latest
     env:
       SCCACHE_DIR: ${{ github.workspace }}/.sccache
@@ -32,23 +34,22 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: .sccache
-          key: sccache-win-64-fix-unit3-retract-stack
+          key: sccache-win-64-diag-fix-framesize
           restore-keys: sccache-win-64-
 
-      - name: Build GTSAM and the unit tests
-        run: pixi run -e test build-tests
+      - name: Configure
+        run: pixi run -e test configure
 
-      - name: Run the C++ tests
-        run: pixi run -e test test
+      # Only the library: the PDB carries the frame sizes, no tests needed.
+      - name: Build gtsam
+        run: pixi run -e test cmake --build build --target gtsam
 
-      - name: Cache statistics
-        if: always()
-        run: pixi run -e test sccache --show-stats
-        continue-on-error: true
+      - name: Measure the stack frames
+        run: pixi exec --spec llvm-tools -- pwsh -NoProfile -File .github/diag/framesize.ps1
 
       - name: Save the compiler cache
         if: always()
         uses: actions/cache/save@v6
         with:
           path: .sccache
-          key: sccache-win-64-fix-unit3-retract-stack
+          key: sccache-win-64-diag-fix-framesize

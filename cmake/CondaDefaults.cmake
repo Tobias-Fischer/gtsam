@@ -33,5 +33,13 @@ set(Boost_USE_STATIC_LIBS OFF CACHE BOOL "")
 # files collide at link time.
 set(GTSAM_SINGLE_TEST_EXE OFF CACHE BOOL "")
 
+# DIAGNOSTIC ONLY: /Z7 emits debug info into the objects so the PDB carries
+# frame sizes. Optimisation is untouched, so the frame measured is the frame
+# the real build produces.
+if(WIN32)
+  add_compile_options(/Z7)
+  add_link_options(/DEBUG)
+endif()
+
 set(GTSAM_BUILD_PYTHON ON CACHE BOOL "")
 set(GTSAM_INSTALL_CPPUNITLITE OFF CACHE BOOL "")
