@@ -81,6 +81,11 @@ public:
   /// Copy assignment: copies essential data and invalidates local caches.
   Unit3& operator=(const Unit3& u) {
     if (this == &u) return *this;
+#ifdef GTSAM_USE_TBB
+    // basis() takes the same lock before it fills the caches, so without this
+    // an assignment can reset them underneath a concurrent basis() call.
+    std::unique_lock<std::mutex> lock(B_mutex_);
+#endif
     p_ = u.p_;
 
     // Since p_ has changed, the old cached basis is no longer valid.
