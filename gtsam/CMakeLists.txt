@@ -232,7 +232,12 @@ endif()
 gtsam_apply_build_flags(gtsam)
 
 if(GTSAM_BUILD_WITH_PRECOMPILED_HEADERS)
-  target_precompile_headers(gtsam PRIVATE $<$<COMPILE_LANGUAGE:CXX>:<gtsam/precompiled_header.h$<ANGLE-R>>)
+  # DIAGNOSTIC: force-include the same header textually instead of
+  # precompiling it. Same declarations reach every translation unit, but none
+  # of the precompiled-header machinery is used, which separates the effect of
+  # the header contents from the effect of PCH handling itself.
+  target_compile_options(gtsam PRIVATE
+      $<$<COMPILE_LANGUAGE:CXX>:/FI${CMAKE_CURRENT_SOURCE_DIR}/precompiled_header.h>)
 endif()
 
 set_target_properties(gtsam PROPERTIES
